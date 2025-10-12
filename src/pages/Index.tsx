@@ -10,6 +10,7 @@ import { MoreVertical, Leaf, RefreshCw } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
 import { PotatoBot } from "@/components/PotatoBot";
 import { MenuDialog } from "@/components/MenuDialog";
+import { EmissionCalculator } from "@/components/EmissionCalculator";
 import riverBg from "@/assets/river-bg.jpg";
 
 const Index = () => {
@@ -136,6 +137,19 @@ const Index = () => {
             <p className="text-xl md:text-2xl text-white/90 max-w-2xl drop-shadow-md">
               News & Updates from Around the World
             </p>
+          </div>
+        </section>
+
+        {/* Calculator Section */}
+        <section className="mb-12">
+          <div className="bg-card/95 backdrop-blur-xl rounded-2xl shadow-2xl border-2 border-primary/20 overflow-hidden">
+            <div className="bg-gradient-to-r from-primary to-primary/80 p-4">
+              <h3 className="text-2xl font-bold text-primary-foreground">Carbon Emissions Calculator & Advisor</h3>
+              <p className="text-primary-foreground/80 text-sm">Calculate your carbon footprint and get personalized advice</p>
+            </div>
+            <div className="p-6">
+              <EmissionCalculator />
+            </div>
           </div>
         </section>
 
