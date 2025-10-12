@@ -1,12 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import potatoBotImg from "@/assets/potato-bot.png";
 import { EmissionCalculator } from "./EmissionCalculator";
 
-export const PotatoBot = () => {
+interface PotatoBotProps {
+  isRefreshing?: boolean;
+}
+
+export const PotatoBot = ({ isRefreshing = false }: PotatoBotProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDancing, setIsDancing] = useState(false);
+
+  useEffect(() => {
+    if (isRefreshing) {
+      setIsDancing(true);
+      setTimeout(() => setIsDancing(false), 2000);
+    }
+  }, [isRefreshing]);
 
   const handleBotClick = () => {
     setIsDancing(true);
@@ -67,7 +78,7 @@ export const PotatoBot = () => {
             </div>
 
             {/* Calculator Content */}
-            <div className="p-4 max-h-[70vh] overflow-y-auto">
+            <div className="p-4 h-[70vh]">
               <EmissionCalculator />
             </div>
           </div>

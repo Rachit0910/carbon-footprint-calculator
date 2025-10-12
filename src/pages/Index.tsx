@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Leaf } from "lucide-react";
+import { MoreVertical, Leaf, RefreshCw } from "lucide-react";
 import { NewsCard } from "@/components/NewsCard";
 import { PotatoBot } from "@/components/PotatoBot";
 import { MenuDialog } from "@/components/MenuDialog";
@@ -15,11 +15,30 @@ import riverBg from "@/assets/river-bg.jpg";
 const Index = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState<"about" | "info">("about");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [newsKey, setNewsKey] = useState(0);
 
   const openDialog = (content: "about" | "info") => {
     setDialogContent(content);
     setDialogOpen(true);
   };
+
+  const refreshNews = () => {
+    setIsRefreshing(true);
+    setNewsKey(prev => prev + 1);
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 2000);
+  };
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshNews();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Sample news data
   const newsItems = [
@@ -122,21 +141,32 @@ const Index = () => {
 
         {/* News Grid */}
         <section>
-          <div className="mb-8">
-            <h3 className="text-3xl font-bold text-foreground mb-2">Latest Updates</h3>
-            <p className="text-muted-foreground">Stay informed about global carbon emission trends and initiatives</p>
+          <div className="mb-8 flex justify-between items-center">
+            <div>
+              <h3 className="text-3xl font-bold text-foreground mb-2">Latest Updates</h3>
+              <p className="text-muted-foreground">Stay informed about global carbon emission trends and initiatives</p>
+            </div>
+            <Button
+              onClick={refreshNews}
+              disabled={isRefreshing}
+              variant="outline"
+              size="icon"
+              className="relative"
+            >
+              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {newsItems.map((news, index) => (
-              <NewsCard key={index} {...news} />
+              <NewsCard key={`${newsKey}-${index}`} {...news} />
             ))}
           </div>
         </section>
       </main>
 
       {/* Potato Bot */}
-      <PotatoBot />
+      <PotatoBot isRefreshing={isRefreshing} />
 
       {/* Menu Dialog */}
       <MenuDialog open={dialogOpen} onOpenChange={setDialogOpen} content={dialogContent} />

@@ -1,158 +1,183 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Send, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+type Message = { role: "user" | "assistant"; content: string };
 
 export const EmissionCalculator = () => {
-  const [scenario, setScenario] = useState("");
-  const [value, setValue] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ emissions: number; tips: string[] } | null>(null);
-
-  const calculateEmissions = async () => {
-    if (!scenario || !value) {
-      toast.error("Please select a scenario and enter a value");
-      return;
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "assistant",
+      content: "Hi! I'm your carbon emissions advisor. Ask me anything about reducing your carbon footprint, calculating emissions, or getting eco-friendly tips!"
     }
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-    setLoading(true);
-    try {
-      // Simulation of calculation (will be replaced with actual backend call)
-      const emissions = calculateEmissionsLocal(scenario, parseFloat(value));
-      const tips = getTips(scenario, emissions);
-      
-      setResult({ emissions, tips });
-      toast.success("Emissions calculated successfully!");
-    } catch (error) {
-      toast.error("Failed to calculate emissions");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  };
+  }, [messages]);
 
-  const calculateEmissionsLocal = (scenario: string, value: number): number => {
-    const EMISSION_FACTORS = {
-      travel: 0.12, // kg CO2 per km
-      electricity: 0.92, // kg CO2 per kWh
-      flight: 90, // kg CO2 per flight hour
-    };
-
-    switch (scenario) {
-      case "travel":
-        return value * EMISSION_FACTORS.travel;
-      case "electricity":
-        return value * EMISSION_FACTORS.electricity;
-      case "flight":
-        return value * EMISSION_FACTORS.flight;
-      default:
-        return 0;
-    }
-  };
-
-  const getTips = (scenario: string, emissions: number): string[] => {
-    const baseTips: Record<string, string[]> = {
-      travel: [
-        "Use public transport, carpool, or switch to a fuel-efficient vehicle",
-        "Consider cycling or walking for short distances",
-        "Plan combined trips to reduce overall mileage",
-      ],
-      electricity: [
-        "Turn off unused appliances and switch to LED bulbs",
-        "Consider renewable electricity sources",
-        "Use energy-efficient appliances",
-      ],
-      flight: [
-        "Consider train travel for short distances",
-        "Offset your flights with carbon credits",
-        "Reduce flight frequency when possible",
-      ],
-    };
-
-    const tips = baseTips[scenario] || [];
+  const streamChat = async (userMessage: string) => {
+    const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/carbon-advice`;
     
-    if (emissions > 100) {
-      tips.unshift("⚠️ Your emissions are high - try long-term behavior changes like reducing meat consumption");
-    } else if (emissions > 0) {
-      tips.unshift("✅ Good job - small steps add up! Keep track of your monthly footprint");
-    }
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ 
+          messages: [...messages, { role: "user", content: userMessage }]
+        }),
+      });
 
-    return tips;
+      if (!resp.ok) {
+        if (resp.status === 429) {
+          toast({
+            title: "Rate limit exceeded",
+            description: "Please try again in a moment.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (resp.status === 402) {
+          toast({
+            title: "Payment required",
+            description: "Please add credits to continue.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error("Failed to start stream");
+      }
+
+      if (!resp.body) throw new Error("No response body");
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+      let streamDone = false;
+      let assistantContent = "";
+
+      // Add empty assistant message
+      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") {
+            streamDone = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantContent += content;
+              setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  role: "assistant",
+                  content: assistantContent
+                };
+                return newMessages;
+              });
+            }
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+      // Remove the empty assistant message on error
+      setMessages(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = input.trim();
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+    setIsLoading(true);
+
+    await streamChat(userMessage);
+    setIsLoading(false);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="scenario">Select Activity</Label>
-        <Select value={scenario} onValueChange={setScenario}>
-          <SelectTrigger id="scenario">
-            <SelectValue placeholder="Choose an activity..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="travel">Car Travel (km)</SelectItem>
-            <SelectItem value="electricity">Electricity (kWh)</SelectItem>
-            <SelectItem value="flight">Flight (hours)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="flex flex-col h-full">
+      <ScrollArea className="flex-1 pr-4 mb-4" ref={scrollRef}>
+        <div className="space-y-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  message.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground"
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-secondary text-secondary-foreground rounded-2xl px-4 py-3">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
-      <div className="space-y-2">
-        <Label htmlFor="value">Enter Value</Label>
+      <form onSubmit={handleSubmit} className="flex gap-2">
         <Input
-          id="value"
-          type="number"
-          placeholder="Enter amount..."
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          min="0"
-          step="0.1"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask about reducing emissions..."
+          disabled={isLoading}
+          className="flex-1"
         />
-      </div>
-
-      <Button
-        onClick={calculateEmissions}
-        disabled={loading}
-        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 transition-opacity"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Calculating...
-          </>
-        ) : (
-          <>
-            <Sparkles className="mr-2 h-4 w-4" />
-            Calculate Emissions
-          </>
-        )}
-      </Button>
-
-      {result && (
-        <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
-          <CardContent className="pt-6 space-y-4">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Total CO2 Emissions</p>
-              <p className="text-4xl font-bold text-primary">{result.emissions.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">kg CO2</p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="font-semibold text-sm">💡 Tips to Reduce:</p>
-              <ul className="space-y-2">
-                {result.tips.map((tip, index) => (
-                  <li key={index} className="text-sm text-muted-foreground flex gap-2">
-                    <span className="text-primary">•</span>
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        <Button type="submit" disabled={isLoading || !input.trim()} size="icon">
+          <Send className="h-4 w-4" />
+        </Button>
+      </form>
     </div>
   );
 };
