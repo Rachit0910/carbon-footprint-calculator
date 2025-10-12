@@ -12,25 +12,83 @@ import { PotatoBot } from "@/components/PotatoBot";
 import { MenuDialog } from "@/components/MenuDialog";
 import { EmissionCalculator } from "@/components/EmissionCalculator";
 import riverBg from "@/assets/river-bg.jpg";
+import { supabase } from "@/integrations/supabase/client";
+
+interface NewsItem {
+  title: string;
+  summary: string;
+  source: string;
+  region: string;
+  url: string;
+}
 
 const Index = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState<"about" | "info">("about");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [newsKey, setNewsKey] = useState(0);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const openDialog = (content: "about" | "info") => {
     setDialogContent(content);
     setDialogOpen(true);
   };
 
-  const refreshNews = () => {
+  const fetchNews = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('fetch-carbon-news');
+      
+      if (error) throw error;
+      
+      if (data?.news) {
+        setNewsItems(data.news);
+      }
+    } catch (error) {
+      console.error('Error fetching news:', error);
+      // Use fallback news if fetch fails
+      setNewsItems([
+        {
+          title: "Global CO2 Emissions Reach Record High in 2024",
+          summary: "Despite climate pledges, global carbon emissions from fossil fuels reached a new peak this year.",
+          source: "International Energy Agency",
+          region: "Global",
+          url: "https://www.iea.org/",
+        },
+        {
+          title: "EU Announces Stricter Emission Targets for 2030",
+          summary: "European Union leaders commit to reducing greenhouse gas emissions by 55% compared to 1990 levels.",
+          source: "European Commission",
+          region: "Europe",
+          url: "https://ec.europa.eu/",
+        },
+        {
+          title: "Renewable Energy Surpasses Coal in US Power Generation",
+          summary: "For the first time, renewable energy sources generated more electricity than coal in the United States.",
+          source: "US Energy Department",
+          region: "North America",
+          url: "https://www.energy.gov/",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshNews = async () => {
     setIsRefreshing(true);
     setNewsKey(prev => prev + 1);
+    await fetchNews();
     setTimeout(() => {
       setIsRefreshing(false);
-    }, 2000);
+    }, 1000);
   };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchNews();
+  }, []);
 
   // Auto-refresh every 5 minutes
   useEffect(() => {
@@ -40,52 +98,6 @@ const Index = () => {
 
     return () => clearInterval(interval);
   }, []);
-
-  // Sample news data
-  const newsItems = [
-    {
-      title: "Global CO2 Emissions Reach Record High in 2024",
-      summary: "Despite climate pledges, global carbon emissions from fossil fuels reached a new peak this year, according to the latest climate report.",
-      source: "International Energy Agency",
-      region: "Global",
-      url: "#",
-    },
-    {
-      title: "EU Announces Stricter Emission Targets for 2030",
-      summary: "European Union leaders commit to reducing greenhouse gas emissions by 55% compared to 1990 levels by the end of the decade.",
-      source: "European Commission",
-      region: "Europe",
-      url: "#",
-    },
-    {
-      title: "Renewable Energy Surpasses Coal in US Power Generation",
-      summary: "For the first time in history, renewable energy sources generated more electricity than coal in the United States over the past year.",
-      source: "US Energy Department",
-      region: "North America",
-      url: "#",
-    },
-    {
-      title: "China Invests $550B in Green Technology",
-      summary: "China announces massive investment in renewable energy and electric vehicle infrastructure as part of carbon neutrality goals.",
-      source: "Reuters",
-      region: "Asia",
-      url: "#",
-    },
-    {
-      title: "Ocean Carbon Absorption Declining Faster Than Expected",
-      summary: "New research shows that oceans are absorbing less CO2 than previously thought, raising concerns about climate tipping points.",
-      source: "Nature Climate Change",
-      region: "Global",
-      url: "#",
-    },
-    {
-      title: "Corporate Giants Pledge Net-Zero by 2040",
-      summary: "Over 200 major corporations commit to achieving net-zero carbon emissions a decade ahead of Paris Agreement timeline.",
-      source: "UN Climate Summit",
-      region: "Global",
-      url: "#",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5">
@@ -172,9 +184,16 @@ const Index = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {newsItems.map((news, index) => (
-              <NewsCard key={`${newsKey}-${index}`} {...news} />
-            ))}
+            {isLoading ? (
+              // Loading skeleton
+              Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="h-48 bg-card/80 backdrop-blur-sm border-2 rounded-lg animate-pulse" />
+              ))
+            ) : (
+              newsItems.map((news, index) => (
+                <NewsCard key={`${newsKey}-${index}`} {...news} />
+              ))
+            )}
           </div>
         </section>
       </main>

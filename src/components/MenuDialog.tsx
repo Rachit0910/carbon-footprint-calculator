@@ -21,13 +21,15 @@ export const MenuDialog = ({ open, onOpenChange, content }: MenuDialogProps) => 
         {content === "about" ? (
           <>
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold text-primary">About Us</DialogTitle>
-              <DialogDescription>Get in touch with the creator</DialogDescription>
+              <DialogTitle className="text-2xl font-bold text-primary">Get in touch with us</DialogTitle>
+              <DialogDescription>Connect with our team</DialogDescription>
             </DialogHeader>
             <div className="space-y-6 py-4">
               <div className="space-y-2">
-                <h3 className="font-semibold text-lg">Creator</h3>
+                <h3 className="font-semibold text-lg">Team Members</h3>
                 <p className="text-muted-foreground">Rachit Mishra</p>
+                <p className="text-muted-foreground">Raj</p>
+                <p className="text-muted-foreground">Prakhar Agrahari</p>
               </div>
 
               <div className="space-y-3">
@@ -40,7 +42,9 @@ export const MenuDialog = ({ open, onOpenChange, content }: MenuDialogProps) => 
                 </div>
                 <div className="flex items-center gap-3 text-muted-foreground">
                   <Mail className="h-5 w-5 text-primary" />
-                  <span>Available via phone</span>
+                  <a href="mailto:rachitmishra0910@gmail.com" className="hover:text-primary transition-colors">
+                    rachitmishra0910@gmail.com
+                  </a>
                 </div>
               </div>
 
@@ -93,14 +97,6 @@ export const MenuDialog = ({ open, onOpenChange, content }: MenuDialogProps) => 
                     <span>AI-powered chatbot assistance</span>
                   </li>
                 </ul>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-lg mb-2">Technology</h3>
-                <p className="text-muted-foreground text-sm">
-                  Built with modern web technologies including React, TypeScript, and Tailwind CSS,
-                  with a focus on performance and user experience.
-                </p>
               </div>
 
               <div className="pt-2">
