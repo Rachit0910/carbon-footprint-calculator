@@ -78,7 +78,7 @@ export const PotatoBot = ({ isRefreshing = false }: PotatoBotProps) => {
             </div>
 
             {/* Calculator Content */}
-            <div className="p-4 h-[70vh]">
+            <div className="p-4 max-h-[70vh] overflow-auto">
               <EmissionCalculator />
             </div>
           </div>
