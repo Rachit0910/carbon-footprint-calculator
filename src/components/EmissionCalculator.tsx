@@ -108,12 +108,12 @@ export const EmissionCalculator = () => {
         </div>
       </div>
 
-      <Button onClick={calculateEmissions} className="w-full">
+      <Button onClick={calculateEmissions} className="w-full hover-scale">
         Calculate Emissions
       </Button>
 
       {totalEmissions !== null && (
-        <Card className="p-6 bg-primary/5 border-primary/20">
+        <Card className="p-6 bg-primary/5 border-primary/20 animate-fade-in">
           <div className="text-center mb-4">
             <h3 className="text-2xl font-bold text-primary mb-2">
               Total Monthly Emissions
